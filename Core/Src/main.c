@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include"string.h"
+#include "menu.h"
 #include "ST7735.h"
 #include"GFX_FUNCTIONS.h"
 /* USER CODE END Includes */
@@ -42,6 +43,14 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+CRYP_HandleTypeDef hcryp;
+__ALIGN_BEGIN static const uint8_t pKeyAES[16] __ALIGN_END = {
+                            0x01,0x0A,0x02,0x0B,0x03,0x0F,0x04,0x05,0x07,0x0D,
+                            0x0C,0x0E,0x0B,0x09,0x08,0x00};
+__ALIGN_BEGIN static const uint8_t pInitVectAES[16] __ALIGN_END = {
+                            0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,
+                            0x0B,0x0C,0x0D,0x0E,0x0F,0x00};
+
 UART_HandleTypeDef hlpuart1;
 
 SPI_HandleTypeDef hspi1;
@@ -61,106 +70,23 @@ static void MX_DMA_Init(void);
 static void MX_LPUART1_UART_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_TIM1_Init(void);
+static void MX_AES_Init(void);
 /* USER CODE BEGIN PFP */
-typedef void (*MenuAction)(void);
-//It's a pointer to a function.
-//The function takes no arguments ((void)).
-//The function returns nothing (void).
-typedef struct{
- const char *label;
- MenuAction action;
-}MenuItem;
+//typedef void (*MenuAction)(void);
+////It's a pointer to a function.
+////The function takes no arguments ((void)).
+////The function returns nothing (void).
+//typedef struct{
+// const char *label;
+// MenuAction action;
+//}MenuItem;
 
-void action_test_lcd(){testAll();}
+//void action_test_lcd(){testAll();}
 
 volatile uint8_t rx_ready = 0;
 char last_char;
 uint8_t rx_char;
-uint8_t brightness = 50;  // Default 50%
-// Draw a simple light bulb ON
-void draw_bulb_on(void) {
-	fillScreen(BLACK);
-    fillCircle(64, 40, 20, YELLOW);         // Bulb head
-    ST7735_FillRectangle(60, 60, 8, 15, GRAY);          // Bulb base
-    drawLine(64, 75, 64, 100, ORANGE);      // Glow line
-}
-//draw simple led off
-void draw_bulb_off(void) {
-    fillScreen(BLACK);
-    fillCircle(64, 40, 20, GRAY);         // Bulb head
-    ST7735_FillRectangle(60, 60, 8, 15, WHITE);          // Bulb base
-    drawLine(64, 75, 64, 100, ORANGE);      // Glow line
-}
-void action_led_on(){
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET); // LED ON
-	char msg[] = "LED turned ON\r\n";
-	fillScreen(BLACK);
-	draw_bulb_on();
-	ST7735_WriteString(5, 90,msg, Font_11x18, YELLOW, BLACK);
-}
-void action_led_off(){
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET); // LED OFF
-	char msg[] = "LED turned OFF\r\n";
-	fillScreen(BLACK);
-	draw_bulb_off();
-	ST7735_WriteString(5, 90,msg, Font_11x18,CYAN, BLACK);
-}
-void led_toggle(){
-	HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_14);
-	char msg[] = "LED Toggled\r\n";
 
-	fillScreen(BLACK);
-
-	ST7735_WriteString(5, 90,msg, Font_11x18, GREEN, BLACK);
-}
-MenuItem menu[] = {
-		{"TEST LCD",action_test_lcd},
-		{"LED ON",action_led_on},
-		{"LED OFF",action_led_off},
-		{"LED TOGGLE",led_toggle}
-
-};
-#define NUM_OPTIONS (sizeof(menu))/sizeof(MenuItem)
-
-
-void draw_menu(int selected) {
-	fillScreen(BLACK);
-
-    for (int i = 0; i < NUM_OPTIONS; i++) {
-        uint16_t y = 10 + i * 20;
-        if (i == selected) {
-        	 ST7735_WriteString(10, y, "->", Font_11x18, YELLOW, BLACK);
-
-        }
-        ST7735_WriteString(30, y, menu[i].label, Font_11x18,//check if the string is selected, if selected make it yellow
-                i == selected ? YELLOW : WHITE, BLACK);
-    }
-
-
-
-}
-
-
-
-void set_backlight_brightness(uint8_t percent) {
-    if (percent > 100) percent = 100;
-    uint32_t pulse = (htim1.Init.Period + 1) * percent / 100;
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, pulse);
-
-
-}
-void backlight_display(){
-	  char b_str[8];  // Enough for "100%" + null terminator
-
-	    // Easy conversion
-	    b_str[0] = (brightness / 100) + '0';                 // Hundreds
-	    b_str[1] = ((brightness / 10) % 10) + '0';           // Tens
-	    b_str[2] = (brightness % 10) + '0';                  // Ones
-	    b_str[3] = '%';                                      // Percent symbol
-	    b_str[4] = '\0';                                     // Null-terminate
-	    ST7735_WriteString(0, 100, "Bright: ", Font_11x18, WHITE, BLACK);
-	    ST7735_WriteString(95, 100, b_str, Font_11x18, WHITE, BLACK);
-}
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     if (huart->Instance == LPUART1) {
@@ -176,14 +102,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-//char data[]="Type (LED ON)/(LED OFF)/TOGGLE\r\n";
-
-//char intro[] = "TYPE\nLED ON\nLED OFF\nTOGGLED";
-
 int selected = 0;
-
-
-
 
 /* USER CODE END 0 */
 
@@ -220,6 +139,7 @@ int main(void)
   MX_LPUART1_UART_Init();
   MX_SPI1_Init();
   MX_TIM1_Init();
+  MX_AES_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 
@@ -282,65 +202,7 @@ int main(void)
 	         }
 	     }
   }
-	  //	  HAL_UART_Receive(&hlpuart1, (uint8_t*)&rx_char, 1, HAL_MAX_DELAY);
-//	  HAL_UART_Transmit(&hlpuart1,(uint8_t*) &rx_char, 1, HAL_MAX_DELAY);  // Echo back
-//
-//	            switch (rx_char) {
-//	                        case 'w': // Up
-//	                            selected--;
-//	                            if (selected < 0) selected = NUM_OPTIONS - 1;
-//	                            draw_menu(selected);
-//	                            break;
-//
-//	                        case 's': // Down
-//	                            selected++;
-//	                            if (selected >= NUM_OPTIONS) selected = 0;
-//	                            draw_menu(selected);
-//	                            break;
-//
-//	                        case '\r': // Enter
-//	                      	  fillScreen(
-//	                      			  BLACK);
-//	                            process_command((char*)menu[selected]);
-//	                            HAL_Delay(2000); // Pause for 2s
-//	                            draw_menu(selected);  // Return to menu
-//
-//	                            break;
-//	               }
 
-
-//      memset(rx_buffer, 0, sizeof(rx_buffer));
-//      HAL_UART_Transmit(&hlpuart1, (uint8_t*)"\r\n", 2, HAL_MAX_DELAY);
-//      HAL_UART_Transmit(&hlpuart1,(uint8_t*)data, strlen(data), HAL_MAX_DELAY);
-     // fillCircle(5, 32, 5, BLUE);
-     // ST7735_WriteStringWithSeparators(20, 0, intro, Font_11x18, WHITE, BLACK);
-//      uint8_t idx = 0;
-//       uint8_t ch;
-
-
-
-//          while (1)
-//          {
-//              // Receive one character
-//              HAL_UART_Receive(&hlpuart1, &ch, 1, HAL_MAX_DELAY);
-//
-//              // Echo the character back
-//              HAL_UART_Transmit(&hlpuart1, &ch, 1, HAL_MAX_DELAY);
-//
-//              // Store into buffer
-//              rx_buffer[idx++] = ch;
-//
-//              // Break on newline or carriage return
-//              if (ch == '\r' || ch == '\n' || idx >= sizeof(rx_buffer) - 1)
-//              {
-//                  rx_buffer[idx] = '\0'; // Null-terminate the string
-//                  break;
-//              }
-//          }
-
-          // send a newline after the echo
-         // HAL_UART_Transmit(&hlpuart1, (uint8_t*)"\r\n", 2, HAL_MAX_DELAY);
-  //          process_command((char*)rx_buffer);
 
   /* USER CODE END 3 */
 }
@@ -392,6 +254,39 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief AES Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_AES_Init(void)
+{
+
+  /* USER CODE BEGIN AES_Init 0 */
+
+  /* USER CODE END AES_Init 0 */
+
+  /* USER CODE BEGIN AES_Init 1 */
+
+  /* USER CODE END AES_Init 1 */
+  hcryp.Instance = AES;
+  hcryp.Init.DataType = CRYP_DATATYPE_8B;
+  hcryp.Init.KeySize = CRYP_KEYSIZE_128B;
+  hcryp.Init.OperatingMode = CRYP_ALGOMODE_ENCRYPT;
+  hcryp.Init.ChainingMode = CRYP_CHAINMODE_AES_CBC;
+  hcryp.Init.KeyWriteFlag = CRYP_KEY_WRITE_ENABLE;
+  hcryp.Init.pKey = (uint8_t *)pKeyAES;
+  hcryp.Init.pInitVect = (uint8_t *)pInitVectAES;
+  if (HAL_CRYP_Init(&hcryp) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN AES_Init 2 */
+
+  /* USER CODE END AES_Init 2 */
+
 }
 
 /**

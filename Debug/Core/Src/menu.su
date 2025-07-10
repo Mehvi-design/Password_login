@@ -1,0 +1,9 @@
+../Core/Src/menu.c:25:6:action_test_lcd	8	static
+../Core/Src/menu.c:27:6:draw_bulb_on	16	static
+../Core/Src/menu.c:34:6:draw_bulb_off	16	static
+../Core/Src/menu.c:40:6:action_led_on	48	static
+../Core/Src/menu.c:47:6:action_led_off	56	static
+../Core/Src/menu.c:54:6:led_toggle	48	static
+../Core/Src/menu.c:66:6:draw_menu	48	static
+../Core/Src/menu.c:83:6:set_backlight_brightness	24	static
+../Core/Src/menu.c:90:6:backlight_display	32	static
