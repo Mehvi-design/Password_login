@@ -72,29 +72,48 @@ static void MX_SPI1_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_AES_Init(void);
 /* USER CODE BEGIN PFP */
-//typedef void (*MenuAction)(void);
-////It's a pointer to a function.
-////The function takes no arguments ((void)).
-////The function returns nothing (void).
-//typedef struct{
-// const char *label;
-// MenuAction action;
-//}MenuItem;
+#define buffersize 16
+uint8_t plain_text[buffersize] = "hello1234567890"; // pad to 16 bytes
+uint8_t encrypted_text[buffersize];
+int selected = 0;
 
-//void action_test_lcd(){testAll();}
+uint8_t user_encrypted_text[buffersize];
+char rx_buffer[buffersize];
+uint8_t decrypted_text[buffersize];
 
 volatile uint8_t rx_ready = 0;
 char last_char;
 uint8_t rx_char;
+uint8_t pass_wrong;
+void pass(){
+	if(memcmp(user_encrypted_text,encrypted_text,buffersize)!=0){
+				 //  HAL_UART_Transmit(&hlpuart1, (uint8_t *)"Invalid Password", strlen("Invalid Password"), HAL_MAX_DELAY);
+		fillScreen(BLACK);
+		ST7735_WriteString(5, 90,"Invalid Password", Font_11x18, RED, BLACK);
+		pass_wrong=1;
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-{
-    if (huart->Instance == LPUART1) {
-        last_char = rx_char;
-        rx_ready = 1; // Signal main loop
-        HAL_UART_Receive_IT(&hlpuart1, &rx_char, 1);
-    }
+	}else{
+					//HAL_UART_Transmit(&hlpuart1, (uint8_t *)"WELCOME!!", strlen("WELCOME!!"), HAL_MAX_DELAY);
+		fillScreen(BLACK);
+		draw_menu(selected);
+		ST7735_WriteString(95, 100, "Welcome", Font_11x18, WHITE, BLACK);
+		pass_wrong=0;
+	}
 }
+void ByteToHex(uint8_t byte, char *hex)
+{
+    const char hex_chars[] = "0123456789ABCDEF";
+    hex[0] = hex_chars[(byte >> 4) & 0x0F];
+    hex[1] = hex_chars[byte & 0x0F];
+}
+//void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+//{
+//    if (huart->Instance == LPUART1) {
+//        last_char = rx_char;
+//        rx_ready = 1; // Signal main loop
+//        HAL_UART_Receive_IT(&hlpuart1, &rx_char, 1);
+//    }
+//}
 
 
 
@@ -102,7 +121,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-int selected = 0;
 
 /* USER CODE END 0 */
 
@@ -147,10 +165,49 @@ int main(void)
   set_backlight_brightness(brightness);
   ST7735_Init(0);
   fillScreen(BLACK);
-  ST7735_SetRotation (1);
-  draw_menu(selected);
-//  char rx_buffer[8];
-  HAL_UART_Receive_IT(&hlpuart1, &rx_char, 1);
+  //ST7735_SetRotation (1);
+  //draw_menu(selected);
+//  char rx_buffer[8]
+  // Encrypt
+  if (HAL_CRYP_AESCBC_Encrypt(&hcryp,plain_text, buffersize, encrypted_text, HAL_MAX_DELAY) != HAL_OK) {
+   	                             Error_Handler();
+   	                         }
+  if (HAL_CRYP_AESCBC_Decrypt(&hcryp, encrypted_text, 32, decrypted_text, HAL_MAX_DELAY) != HAL_OK) {
+    	                            Error_Handler();
+    }
+  	   ST7735_WriteString(0, 0,"Decrypted: ",Font_11x18 , GREEN, BLACK);
+       ST7735_WriteString(0, 20,(const char*)decrypted_text, Font_11x18, WHITE, BLACK);
+
+
+
+       //HAL_UART_Transmit(&hlpuart1, (uint8_t *)"Encrypted Text: ", strlen("Encrypted Text: "), HAL_MAX_DELAY);
+       ST7735_WriteString(0, 60,"Encrypted: ",Font_11x18 , RED, BLACK);
+       uint16_t x = 0;
+       uint16_t y = 80; // Starting y-position
+       const uint16_t char_width = 20;  // width of each hex character block
+       const uint16_t char_height = 18; // height of the font (Font_11x18)
+
+       for (int i = 0; i < buffersize; i++) {
+           char hex[3];  // Ensure it's large enough for 2 hex digits + null terminator
+           hex[2] = '\0'; // for safety
+           ByteToHex(encrypted_text[i], hex);
+
+           ST7735_WriteString(x, y, (const char*)hex, Font_11x18, WHITE, BLACK);
+
+           x += char_width;
+           if (x + char_width > ST7735_WIDTH) {
+               x = 0;
+               y += char_height;
+           }
+       }
+
+
+     HAL_UART_Transmit(&hlpuart1, (uint8_t *)"\n\r", 2, HAL_MAX_DELAY);
+
+    // HAL_UART_Transmit(&hlpuart1, (uint8_t *)"Decrypted Text: ", strlen("Decrypted Text: "), HAL_MAX_DELAY);
+
+
+//HAL_UART_Receive_IT(&hlpuart1, &rx_char, 1);
 
 
   /* USER CODE END 2 */
@@ -162,47 +219,96 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  memset(rx_buffer, 0, sizeof(rx_buffer));//initialise
+	  memset(user_encrypted_text, 0, sizeof(user_encrypted_text));//initialise
 
-	  if (rx_ready) {
-	         rx_ready = 0;
+		HAL_UART_Transmit(&hlpuart1, (uint8_t*)"\r\n", 2,HAL_MAX_DELAY);
 
-	         switch (last_char) {
-	             case 'w':
-	                 selected--;
-	                 if (selected < 0) selected = NUM_OPTIONS - 1;
-	                 draw_menu(selected);
-	                 break;
+		HAL_UART_Transmit(&hlpuart1, (uint8_t *)"Enter Password: ", strlen("Enter Password: "),HAL_MAX_DELAY);
+		uint8_t idx = 0;
+		uint8_t ch;
 
-	             case 's':
-	                 selected++;
-	                 if (selected >= NUM_OPTIONS) selected = 0;
-	                 draw_menu(selected);
-	                 break;
+				while (1)//taking password
+				{
+					// Receive one character
+					HAL_UART_Receive(&hlpuart1, &ch, 1,HAL_MAX_DELAY);
 
-	             case '\r':
-	            	 fillScreen(BLACK);
-	            	 menu[selected].action();
-	                 HAL_Delay(1000);
-	                 draw_menu(selected);
+					// Echo the character back
+					HAL_UART_Transmit(&hlpuart1, &ch, 1,HAL_MAX_DELAY);
 
-	                 break;
-	             case 'a': // decrease brightness
-	                    if (brightness >= 10) brightness -= 10;
-	                    else brightness = 0;
-	                    set_backlight_brightness(brightness);
-	                    backlight_display();
-	                    break;
+					// Store into buffer
+					rx_buffer[idx++] = ch;
 
-	                case 'd': // increase brightness
-	                    if (brightness <= 90) brightness += 10;
-	                    else brightness = 100;
-	                    set_backlight_brightness(brightness);
-	                    backlight_display();
-	                    break;
-	         }
-	     }
-  }
+					// Break on newline or carriage return
+					if (ch == '\r' || ch == '\n' || idx >= sizeof(rx_buffer) - 1)
+					{
+	//	                            rx_buffer[idx] = '\0'; // Null-terminate the string
+						if(idx<sizeof(rx_buffer)){
+							memset(&rx_buffer[idx],0x00,sizeof(rx_buffer)-idx);
+						}
+						break;
+					}
+				}
 
+
+				if (HAL_CRYP_AESCBC_Encrypt(&hcryp, (uint8_t*)rx_buffer, buffersize, user_encrypted_text, HAL_MAX_DELAY) != HAL_OK) {
+						 Error_Handler();
+					 }
+
+                // send a newline after the echo
+                HAL_UART_Transmit(&hlpuart1, (uint8_t*)"\r\n", 2, HAL_MAX_DELAY);
+
+                if (HAL_CRYP_AESCBC_Encrypt(&hcryp, (uint8_t*)rx_buffer, buffersize, user_encrypted_text, HAL_MAX_DELAY) != HAL_OK) {
+                         Error_Handler();
+                     }
+                if(memcmp(user_encrypted_text,encrypted_text,buffersize)!=0){
+             	   HAL_UART_Transmit(&hlpuart1, (uint8_t *)"Invalid Password", strlen("Invalid Password"), HAL_MAX_DELAY);
+                }else{
+                	HAL_UART_Transmit(&hlpuart1, (uint8_t *)"WELCOME!!", strlen("WELCOME!!"), HAL_MAX_DELAY);
+                }
+
+	  }
+
+//	  if (rx_ready &&!pass_wrong) {
+//	         rx_ready = 0;
+//
+//	         switch (last_char) {
+//	             case 'w':
+//	                 selected--;
+//	                 if (selected < 0) selected = NUM_OPTIONS - 1;
+//	                 draw_menu(selected);
+//	                 break;
+//
+//	             case 's':
+//	                 selected++;
+//	                 if (selected >= NUM_OPTIONS) selected = 0;
+//	                 draw_menu(selected);
+//	                 break;
+//
+//	             case '\r':
+//	            	 fillScreen(BLACK);
+//	            	 menu[selected].action();
+//	                 HAL_Delay(1000);
+//	                 draw_menu(selected);
+//
+//	                 break;
+//	             case 'a': // decrease brightness
+//	                    if (brightness >= 10) brightness -= 10;
+//	                    else brightness = 0;
+//	                    set_backlight_brightness(brightness);
+//	                    backlight_display();
+//	                    break;
+//
+//	                case 'd': // increase brightness
+//	                    if (brightness <= 90) brightness += 10;
+//	                    else brightness = 100;
+//	                    set_backlight_brightness(brightness);
+//	                    backlight_display();
+//	                    break;
+//	         }
+//	     }
+//
+  //}
 
   /* USER CODE END 3 */
 }
