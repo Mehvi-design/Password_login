@@ -435,6 +435,10 @@ void ST7735_WriteString(uint16_t x, uint16_t y, const char* str, FontDef font, u
             str++;  // skip carriage return
             continue;
         }
+        if (*str == '\0') {
+                   str++;  // skip carriage return
+                   continue;
+               }
 
         if (*str == '\n') {
             x = 0;

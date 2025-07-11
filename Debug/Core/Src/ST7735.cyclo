@@ -12,8 +12,8 @@
 ../Core/Src/ST7735.c:309:6:ST7735_SetRotation	5
 ../Core/Src/ST7735.c:373:6:ST7735_DrawPixel	3
 ../Core/Src/ST7735.c:386:6:ST7735_WriteChar	4
-../Core/Src/ST7735.c:430:6:ST7735_WriteString	7
-../Core/Src/ST7735.c:464:6:ST7735_WriteStringWithSeparators	9
-../Core/Src/ST7735.c:510:6:ST7735_FillRectangle	8
-../Core/Src/ST7735.c:624:6:ST7735_DrawImage	5
-../Core/Src/ST7735.c:635:6:ST7735_InvertColors	2
+../Core/Src/ST7735.c:430:6:ST7735_WriteString	8
+../Core/Src/ST7735.c:468:6:ST7735_WriteStringWithSeparators	9
+../Core/Src/ST7735.c:514:6:ST7735_FillRectangle	8
+../Core/Src/ST7735.c:628:6:ST7735_DrawImage	5
+../Core/Src/ST7735.c:639:6:ST7735_InvertColors	2

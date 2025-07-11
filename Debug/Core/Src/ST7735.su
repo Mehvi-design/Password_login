@@ -13,7 +13,7 @@
 ../Core/Src/ST7735.c:373:6:ST7735_DrawPixel	24	static
 ../Core/Src/ST7735.c:386:6:ST7735_WriteChar	48	static
 ../Core/Src/ST7735.c:430:6:ST7735_WriteString	32	static
-../Core/Src/ST7735.c:464:6:ST7735_WriteStringWithSeparators	32	static
-../Core/Src/ST7735.c:510:6:ST7735_FillRectangle	40	static
-../Core/Src/ST7735.c:624:6:ST7735_DrawImage	24	static
-../Core/Src/ST7735.c:635:6:ST7735_InvertColors	16	static
+../Core/Src/ST7735.c:468:6:ST7735_WriteStringWithSeparators	32	static
+../Core/Src/ST7735.c:514:6:ST7735_FillRectangle	40	static
+../Core/Src/ST7735.c:628:6:ST7735_DrawImage	24	static
+../Core/Src/ST7735.c:639:6:ST7735_InvertColors	16	static
